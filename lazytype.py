@@ -1,6 +1,6 @@
-"Type wrappers for typing; module loading deferred till __init__."
+"Wrappers for typing & pydantic models; module loading deferred till __init__."
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 import importlib
 from textwrap import indent
@@ -27,11 +27,15 @@ class _Validator:
 
 
 class LazyTypeMeta(type):
+    registry = {}
 
     def __getitem__(self, wraps: str):
         wraps = _Validator(wraps).key
-        return type('Lazy'+wraps.split('.')[-1], (self,), {'_wraps': wraps,
-                                                           '_instance': None})
+        if wraps not in self.__class__.registry:
+            self.__class__.registry[wraps] = \
+                type('Lazy'+wraps.split('.')[-1], (self,),
+                     {'_wraps': wraps, '_instance': None})
+        return self.__class__.registry[wraps]
 
     def __instancecheck__(self, obj):
         return isinstance(obj, self._load_wraps())
@@ -108,3 +112,91 @@ class LazyType(metaclass=LazyTypeMeta):
 
     def __dir__(self):
         return sorted(set(super().__dir__()).union(self._instance.__dir__()))
+
+
+class LazyFieldMeta(LazyTypeMeta):
+    registry = {}
+
+    def __getitem__(self, wraps: tuple):
+        if not isinstance(wraps, tuple):
+            raise IndexError("Must provide [schematype[:schema_base], "
+                             "*lazy_type_args]")
+        st, lazytype, *lazyextras = wraps
+        t, s, e = ((st.start, st.stop, st.step)
+                   if isinstance(st, slice) else (st, None, None))
+        key = (t, (tuple(i) if isinstance(i, dict) else i for i in (s, e)),
+               lazytype)
+        if key not in self.__class__.registry:
+            if s is None:
+                from pydantic import BaseModel
+
+                class GetAnno(BaseModel):
+                    foo: t
+                s = GetAnno.schema()['properties']['foo']
+            if e is not None:
+                s.update(e)
+            field = LazyTypeMeta.__getitem__(self, (lazytype, *lazyextras))
+            self.__class__.registry[key] = \
+                type('LazyField'+lazytype.split('.')[-1], (field,),
+                     {'__base_schema__': s})
+        return self.__class__.registry[key]
+
+
+class LazyField(LazyType, metaclass=LazyFieldMeta):
+    """
+    Make a ``pydantic`` field with the ``LazyField`` subscript interface. Just
+    like ``LazyType``, but it starts with a type annotation for the pydantic
+    model's JSON schema.
+
+    Examples
+    --------
+    Create a lazy-loading field for ``astropy.time.Time`` using the built-in
+    ``datetime`` string validator:
+    >>> from datetime import datetime
+    >>> LazyField[datetime, 'astropy.time.Time', 'strict':True]
+    lazytype.LazyFieldTime
+
+    Actually use the field in a ``pydantic`` model:
+    >>> from pydantic import BaseModel
+    >>> class LazyTest(BaseModel):
+    ...     foo: str
+    ...     time: LazyField[datetime, 'astropy.time.Time', 'strict':True]
+
+    See the JSON schema of the resulting model:
+    >>> LazyTest.schema()
+    {'title': 'LazyTest',
+     'type': 'object',
+     'properties': {'foo': {'title': 'Foo', 'type': 'string'},
+      'time': {'title': 'Foo', 'type': 'string', 'format': 'date-time'}},
+     'required': ['foo', 'time']}
+
+    Actually instantiate something, forcing ``astropy.time.Time`` to load:
+    >>> t = LazyTest(foo='bar', time='2019-11-29 13:40:29.197')
+    >>> t.time
+    <Lazy <Time object: scale='utc' format='iso' value=2019-11-29 13:40:29.197>>
+    >>> t.time.gps
+    1259070047.197
+
+    Provide additional schema annotations, e.g. providing an example input
+    value:
+    >>> class LazyTest(BaseModel):
+    ...     foo: str
+    ...     time: LazyField[str::{'example': '2019-11-29 13:40:29.197'},
+    ...                     'astropy.time.Time', 'strict':True]
+    >>> LazyTest.schema()
+    {'title': 'LazyTest',
+     'type': 'object',
+     'properties': {'foo': {'title': 'Foo', 'type': 'string'},
+      'time': {'title': 'Foo',
+       'type': 'string',
+       'example': '2019-11-29 13:40:29.197'}},
+     'required': ['foo', 'time']}
+    """
+
+    @classmethod
+    def __get_validators__(cls):
+        yield lambda v: cls(v)
+
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        field_schema.update(cls.__base_schema__)
