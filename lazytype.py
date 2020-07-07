@@ -1,6 +1,6 @@
 "Wrappers for typing & pydantic models; module loading deferred till __init__."
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 import importlib
 from textwrap import indent
@@ -133,6 +133,7 @@ class LazyFieldMeta(LazyTypeMeta):
                 class GetAnno(BaseModel):
                     foo: t
                 s = GetAnno.schema()['properties']['foo']
+                s.pop('title', None)  # title not actually 'foo', of course
             if e is not None:
                 s.update(e)
             field = LazyTypeMeta.__getitem__(self, (lazytype, *lazyextras))
@@ -167,7 +168,7 @@ class LazyField(LazyType, metaclass=LazyFieldMeta):
     {'title': 'LazyTest',
      'type': 'object',
      'properties': {'foo': {'title': 'Foo', 'type': 'string'},
-      'time': {'title': 'Foo', 'type': 'string', 'format': 'date-time'}},
+      'time': {'title': 'Time', 'type': 'string', 'format': 'date-time'}},
      'required': ['foo', 'time']}
 
     Actually instantiate something, forcing ``astropy.time.Time`` to load:
@@ -187,7 +188,7 @@ class LazyField(LazyType, metaclass=LazyFieldMeta):
     {'title': 'LazyTest',
      'type': 'object',
      'properties': {'foo': {'title': 'Foo', 'type': 'string'},
-      'time': {'title': 'Foo',
+      'time': {'title': 'Time',
        'type': 'string',
        'example': '2019-11-29 13:40:29.197'}},
      'required': ['foo', 'time']}

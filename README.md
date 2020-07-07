@@ -106,7 +106,7 @@ See the JSON schema of the resulting model:
 {'title': 'LazyTest',
  'type': 'object',
  'properties': {'foo': {'title': 'Foo', 'type': 'string'},
-  'time': {'title': 'Foo', 'type': 'string', 'format': 'date-time'}},
+  'time': {'title': 'Time', 'type': 'string', 'format': 'date-time'}},
  'required': ['foo', 'time']}
 ```
 
@@ -132,7 +132,7 @@ value:
 {'title': 'LazyTest',
  'type': 'object',
  'properties': {'foo': {'title': 'Foo', 'type': 'string'},
-  'time': {'title': 'Foo',
+  'time': {'title': 'Time',
    'type': 'string',
    'example': '2019-11-29 13:40:29.197'}},
  'required': ['foo', 'time']}
