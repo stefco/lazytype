@@ -1,6 +1,6 @@
 "Wrappers for typing & pydantic models; module loading deferred till __init__."
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 import importlib
 from textwrap import indent
@@ -31,11 +31,11 @@ class LazyTypeMeta(type):
 
     def __getitem__(self, wraps: str):
         wraps = _Validator(wraps).key
-        if wraps not in self.__class__.registry:
-            self.__class__.registry[wraps] = \
+        if (self, wraps) not in self.__class__.registry:
+            self.__class__.registry[self, wraps] = \
                 type('Lazy'+wraps.split('.')[-1], (self,),
                      {'_wraps': wraps, '_instance': None})
-        return self.__class__.registry[wraps]
+        return self.__class__.registry[self, wraps]
 
     def __instancecheck__(self, obj):
         return isinstance(obj, self._load_wraps())
