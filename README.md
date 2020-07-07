@@ -17,6 +17,13 @@ For users:
 pip install lazytype
 ```
 
+Optionally make sure `pydantic` is installed with the `pydantic` option (if you
+plan to use `LazyField`s):
+
+```bash
+pip install lazytype[pydantic]
+```
+
 For developers, clone this repository, change to its directory, and run:
 
 ```bash
@@ -83,7 +90,7 @@ Create a lazy-loading field for `astropy.time.Time` using the built-in
 lazytype.LazyFieldTime
 ```
 
-Actually use the field in a ``pydantic`` model:
+Actually use the field in a `pydantic` model:
 
 ```python
 >>> from pydantic import BaseModel
@@ -103,7 +110,7 @@ See the JSON schema of the resulting model:
  'required': ['foo', 'time']}
 ```
 
-Actually instantiate something, forcing ``astropy.time.Time`` to load:
+Actually instantiate something, forcing `astropy.time.Time` to load:
 
 ```python
 >>> t = LazyTest(foo='bar', time='2019-11-29 13:40:29.197')
