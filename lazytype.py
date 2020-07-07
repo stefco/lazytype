@@ -4,12 +4,32 @@ __version__ = "0.1.0"
 
 import importlib
 from textwrap import indent
-from typing import Union
+
+
+class _Validator:
+
+    def __init__(self, key):
+        self.key, *self.extras = key if isinstance(key, tuple) else (key,)
+        for extra in self.extras:
+            x, args = ((extra.start, (extra.stop, extra.step))
+                        if isinstance(extra, slice) else (extra, ()))
+            try:
+                getattr(self, x)(*args)
+            except AttributeError:
+                raise TypeError("Invalid spec: %s"%extra)
+
+    def strict(self, check, _=None):
+        *mod, clsname = self.key.split('.')
+        modname = '.'.join(mod)
+        if importlib.util.find_spec(modname) is None:
+            raise ImportError("Strict check for module %s availability failed"
+                              % modname)
 
 
 class LazyTypeMeta(type):
 
     def __getitem__(self, wraps: str):
+        wraps = _Validator(wraps).key
         return type('Lazy'+wraps.split('.')[-1], (self,), {'_wraps': wraps,
                                                            '_instance': None})
 
@@ -55,8 +75,8 @@ class LazyType(metaclass=LazyTypeMeta):
 
     etc.
     """
-    _wraps: Union[str, type]
-    _instance: str
+    _wraps: type
+    _instance: object
 
     @classmethod
     def _load_wraps(cls):
